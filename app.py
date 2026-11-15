@@ -1,36 +1,38 @@
+import streamlit as st
 import pandas as pd
-import os
 
-file_path = '/content/cafe_sales.csv'
+st.title("Qahwa Corner - Sales Dashboard")
+st.markdown("Cloud Computing for Data Science - Assignment 1")
 
-if os.path.exists(file_path):
-    df = pd.read_csv(file_path)
-    print("Successfully loaded dataset!")
-    print("Shape:", df.shape)
-    print("First Date:", df['date'].min())
-    print("Last Date:", df['date'].max())
-    print("Number of Branches:", df['branch'].nunique())
+@st.cache_data
+def load_data():
+    df = pd.read_csv('cafe_sales.csv')
+    df['total_sar'] = df['unit_price'] * df['quantity']
+    return df
+
+try:
+    df = load_data()
+except Exception as e:
+    st.error(f"Error loading cafe_sales.csv: {e}")
+    st.stop()
+
+# Branch selector
+branch_list = ['All'] + sorted(df['branch'].unique().tolist())
+selected_branch = st.selectbox('Select Branch', branch_list)
+
+if selected_branch != 'All':
+    filtered_df = df[df['branch'] == selected_branch]
 else:
-    print(f"Error: '{file_path}' not found.")
+    filtered_df = df
 
-df['total_sar'] = df['unit_price'] * df['quantity']
+# Total-revenue metric
+total_rev = filtered_df['total_sar'].sum()
+st.metric(label="Total Revenue (SAR)", value=f"{total_rev:,.2f} SAR")
 
-revenue_per_branch = df.groupby('branch')['total_sar'].sum()
-print(revenue_per_branch)
+# Bar chart of revenue by product
+st.subheader("Revenue by Product")
+product_revenue = filtered_df.groupby('product')['total_sar'].sum()
+st.bar_chart(product_revenue)
 
-best_selling = df.groupby('product')['quantity'].sum().idxmax()
-print("Best-Selling Product:", best_selling)
-
-import matplotlib.pyplot as plt
-
-df['date'] = pd.to_datetime(df['date'])
-df['Month'] = df['date'].dt.to_period('M').astype(str)
-monthly_revenue = df.groupby('Month')['total_sar'].sum()
-
-plt.figure(figsize=(10, 5))
-plt.plot(monthly_revenue.index, monthly_revenue.values, marker='o')
-plt.title('Monthly Revenue')
-plt.xlabel('Month')
-plt.ylabel('Revenue (SAR)')
-plt.grid(True)
-plt.show()
+if st.checkbox("Show Filtered Dataset"):
+    st.dataframe(filtered_df)
